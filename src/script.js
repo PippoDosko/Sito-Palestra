@@ -46,11 +46,11 @@ const now = (+parts.hour % 24) * 60 + (+parts.minute);
 // Indicatore "Aperto ora / Chiuso"
 function statusText() {
   const [, o, c] = HOURS[today];
-  if (o && now >= toMin(o) && now < toMin(c)) return [true, "Aperto ora · chiude alle " + fmt(c)];
-  if (o && now < toMin(o)) return [false, "Chiuso · apre oggi alle " + fmt(o)];
+  if (o && now >= toMin(o) && now < toMin(c)) return [true, "Aperto ora · chiudiamo alle " + fmt(c)];
+  if (o && now < toMin(o)) return [false, "Chiuso · apriamo oggi alle " + fmt(o)];
   for (let k = 1; k <= 7; k++) {
     const h = HOURS[(today + k) % 7];
-    if (h[1]) return [false, "Chiuso · riapre " + (k === 1 ? "domani" : h[0].toLowerCase()) + " alle " + fmt(h[1])];
+    if (h[1]) return [false, "Chiuso · riapriamo " + (k === 1 ? "domani" : h[0].toLowerCase()) + " alle " + fmt(h[1])];
   }
 }
 document.querySelectorAll("[data-status]").forEach(el => {
