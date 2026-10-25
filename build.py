@@ -1,7 +1,9 @@
-"""Genera le pagine del sito in dist/ partendo da src/.
-Ogni pagina esce autonoma (CSS, JS e logo incorporati), così si apre anche in anteprima.
-Uso: python3 build.py"""
-import base64, pathlib
+"""Genera il sito partendo da src/.
+- docs/: il sito online (GitHub Pages). Pagine leggere che usano file separati
+  per stile, script e immagini, scaricati una volta sola e tenuti in memoria dal browser.
+- dist/ e anteprima-sito.html: versioni autosufficienti (tutto incorporato) per le anteprime.
+Uso: python3 build.py   (richiede Pillow per le immagini)"""
+import base64, hashlib, pathlib
 
 ROOT = pathlib.Path(__file__).parent
 SRC, DIST = ROOT / "src", ROOT / "dist"
@@ -9,10 +11,35 @@ DIST.mkdir(exist_ok=True)
 for old in DIST.glob("*.html"):
     old.unlink()  # toglie le pagine eliminate
 
-LOGO = "data:image/png;base64," + base64.b64encode((ROOT / "logo.png").read_bytes()).decode()
+LOGO = "data:image/png;base64," + base64.b64encode((SRC / "img" / "logo.png").read_bytes()).decode()
 CSS = (SRC / "styles.css").read_text()
 IMG_OUTDOOR = "data:image/jpeg;base64," + base64.b64encode((SRC / "img" / "outdoor.jpg").read_bytes()).decode()
 JS = (SRC / "script.js").read_text()
+FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n'
+         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+         '<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Chivo+Mono:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">')
+OUTDOOR_SRCSET = 'srcset="img/outdoor-720.webp 720w, img/outdoor-1179.webp 1179w"'
+
+def version(text):
+    """Breve impronta del contenuto: cambia il nome richiesto quando il file cambia, così il browser non usa la copia vecchia."""
+    return hashlib.sha1(text.encode()).hexdigest()[:8]
+
+# Risorse per le due modalità: incorporate (anteprime) oppure file separati (sito online)
+INLINE = {
+    "logo": LOGO, "outdoor": IMG_OUTDOOR, "outdoor_srcset": "",
+    "icons": f'<link rel="icon" href="{LOGO}">',
+    "css": f"<style>\n{CSS}\n</style>", "js": f"<script>\n{JS}\n</script>", "preload": "",
+}
+FILES = {
+    "logo": "img/logo-128.webp", "outdoor": "img/outdoor-1179.webp", "outdoor_srcset": OUTDOOR_SRCSET + ' sizes="100vw"',
+    "icons": ('<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">\n'
+              '<link rel="icon" href="img/favicon-192.png" sizes="192x192" type="image/png">\n'
+              '<link rel="apple-touch-icon" href="img/apple-touch-icon.png">'),
+    "css": f'<link rel="stylesheet" href="assets/styles.css?v={version(CSS)}">',
+    "js": f'<script src="assets/script.js?v={version(JS)}"></script>',
+    "preload": ('<link rel="preload" as="image" href="img/outdoor-1179.webp" fetchpriority="high" '
+                'imagesrcset="img/outdoor-720.webp 720w, img/outdoor-1179.webp 1179w" imagesizes="100vw">'),
+}
 
 # file, voce di menu, icona, titolo della scheda, descrizione per Google
 PAGES = [
@@ -25,7 +52,7 @@ PAGES = [
     ("personale.html",     "Il personale",   "var(--purple)", "Il personale · Sport's Center 2",
      "Istruttori e staff dello Sport's Center 2 a Roveleto di Cadeo."),
     ("prezzi.html",        "Listino prezzi", "var(--green)", "Listino prezzi · Sport's Center 2",
-     "Abbonamenti trimestrali, semestrali e annuali, ingressi singoli e pacchetti."),
+     "Abbonamenti dal mensile all'annuale, ingresso giornaliero e tariffe ragazzi, per soci e non soci."),
     ("dove-trovarci.html", "Dove trovarci",  "var(--orange)", "Dove trovarci · Sport's Center 2",
      "Orari di apertura, indirizzo, telefono e mappa dello Sport's Center 2 a Roveleto di Cadeo."),
 ]
@@ -51,8 +78,12 @@ def band():
     <div class="btns"><a class="btn" data-tel href="#">Chiama</a><a class="btn ghost" href="dove-trovarci.html">Come raggiungerci</a></div>
     {STRIPE}</div></div>"""
 
-def page(f, title, desc):
-    body = (SRC / "pages" / f).read_text().replace("{{LOGO}}", LOGO).replace("{{IMG_OUTDOOR}}", IMG_OUTDOOR)
+def fill(text, a):
+    return (text.replace("{{LOGO}}", a["logo"]).replace("{{IMG_OUTDOOR}}", a["outdoor"])
+                .replace("{{OUTDOOR_SRCSET}}", a["outdoor_srcset"]))
+
+def page(f, title, desc, a=INLINE):
+    body = fill((SRC / "pages" / f).read_text(), a)
     foot_links = " ".join(f'<a href="{p[0]}">{p[1]}</a>' for p in PAGES)
     return f"""<!doctype html>
 <html lang="it">
@@ -63,20 +94,17 @@ def page(f, title, desc):
 <meta name="color-scheme" content="dark">
 <title>{title}</title>
 <meta name="description" content="{desc}">
-<link rel="icon" href="{LOGO}">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Chivo+Mono:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-{CSS}
-</style>
+{a["icons"]}
+{a["preload"] if f == "index.html" else ""}
+{FONTS}
+{a["css"]}
 </head>
 <body>
 <header>
   {STRIPE}
   <nav class="wrap nav" aria-label="Menu principale">
     <a class="brand" href="index.html">
-      <img src="{LOGO}" alt="Logo ASD Sport's Center 2">
+      <img src="{a["logo"]}" alt="Logo ASD Sport's Center 2" width="42" height="42">
       <b>Sport's Center 2</b>
     </a>
     <ul class="links">
@@ -93,15 +121,13 @@ def page(f, title, desc):
 <footer>
   <div class="wrap">
     <div class="foot">
-      <a class="brand" href="index.html"><img src="{LOGO}" alt=""><div><b>Sport's Center 2</b><small>ASD · Roveleto di Cadeo (PC)</small></div></a>
+      <a class="brand" href="index.html"><img src="{a["logo"]}" alt="" width="42" height="42" loading="lazy"><div><b>Sport's Center 2</b><small>ASD · Roveleto di Cadeo (PC)</small></div></a>
       <nav aria-label="Menu secondario">{foot_links}</nav>
     </div>
     <p class="legal">ASD Sport's Center Due Cadeo · C.F. 90010090331 · P.IVA 01650500331 · <a href="#"><span class="ph">Privacy &amp; cookie policy</span></a></p>
   </div>
 </footer>
-{LEAFLET if f == "dove-trovarci.html" and not PREVIEW_MODE else ""}<script>
-{JS}
-</script>
+{LEAFLET if f == "dove-trovarci.html" and not PREVIEW_MODE else ""}{a["js"]}
 </body>
 </html>
 """
@@ -113,10 +139,32 @@ DOCS.mkdir(exist_ok=True)
 for old in DOCS.glob("*.html"):
     old.unlink()
 (DOCS / ".nojekyll").write_text("")
+(DOCS / "assets").mkdir(exist_ok=True)
+(DOCS / "assets" / "styles.css").write_text(CSS)
+(DOCS / "assets" / "script.js").write_text(JS)
+
+def build_images():
+    """Logo, icone e foto ottimizzati per il sito online, ricavati dai file in src/img/."""
+    from PIL import Image
+    out = DOCS / "img"
+    out.mkdir(exist_ok=True)
+    logo = Image.open(SRC / "img" / "logo.png").convert("RGBA")
+    small = lambda im: im.quantize(colors=128, method=Image.FASTOCTREE, dither=Image.FLOYDSTEINBERG)
+    logo.resize((128, 128), Image.LANCZOS).save(out / "logo-128.webp", quality=88, method=6)
+    logo.resize((32, 32), Image.LANCZOS).save(out / "favicon-32.png", optimize=True)
+    small(logo.resize((192, 192), Image.LANCZOS)).save(out / "favicon-192.png", optimize=True)
+    tile = Image.new("RGBA", (180, 180), (15, 15, 14, 255))  # icona per la schermata Home dell'iPhone
+    tile.alpha_composite(logo.resize((156, 156), Image.LANCZOS), (12, 12))
+    small(tile).save(out / "apple-touch-icon.png", optimize=True)
+    photo = Image.open(SRC / "img" / "outdoor.jpg").convert("RGB")
+    photo.save(out / "outdoor-1179.webp", quality=72, method=6)
+    photo.resize((720, round(720 * photo.height / photo.width)), Image.LANCZOS).save(out / "outdoor-720.webp", quality=72, method=6)
+
+build_images()
 
 for f, _, _, title, desc in PAGES:
-    html = page(f, title, desc)
-    (DIST / f).write_text(html)
+    (DIST / f).write_text(page(f, title, desc))
+    html = page(f, title, desc, FILES)
     if NOINDEX:
         html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="robots" content="noindex, nofollow">', 1)
     (DOCS / f).write_text(html)
@@ -139,7 +187,7 @@ def preview():
     sections = []
     for f, label, ico, title, desc in PAGES:
         key = f[:-5]
-        body = (SRC / "pages" / f).read_text().replace("{{LOGO}}", LOGO).replace("{{IMG_OUTDOOR}}", IMG_OUTDOOR)
+        body = fill((SRC / "pages" / f).read_text(), INLINE)
         extra = band() if f != "dove-trovarci.html" else ""
         sections.append(f'<div class="pv-page" data-page="{key}" data-title="{title}" style="--sec:{ico}" hidden>\n{body}\n{extra}\n</div>')
     full = page("index.html", PAGES[0][3], PAGES[0][4])
