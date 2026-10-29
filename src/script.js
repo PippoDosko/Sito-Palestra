@@ -148,14 +148,27 @@ if ("IntersectionObserver" in window) {
   });
 }
 
-// Mappa interattiva (solo nel sito definitivo, dove viene caricata la libreria Leaflet).
+// Mappa satellitare: si carica solo quando il visitatore la chiede.
+// Prima del clic il sito non si collega a nessun servizio esterno.
 // Se la libreria o la cartografia non arrivano, resta la "cartolina" con il link a Google Maps.
 const mapEl = document.getElementById("map");
-if (mapEl && window.L) {
+function loadOnce(tag, attrs) {
+  return new Promise((ok, ko) => {
+    const el = Object.assign(document.createElement(tag), attrs);
+    el.onload = ok; el.onerror = ko; document.head.appendChild(el);
+  });
+}
+async function showMap() {
+  const btn = mapEl.querySelector("[data-map-load]");
+  btn.disabled = true; btn.textContent = "Caricamento…";
   try {
+    if (!window.L) {
+      await loadOnce("link", { rel: "stylesheet", href: mapEl.dataset.leafletCss });
+      await loadOnce("script", { src: mapEl.dataset.leafletJs });
+    }
     const lat = +mapEl.dataset.lat, lng = +mapEl.dataset.lng;
     const logo = mapEl.querySelector(".map-pin img").src;
-    const gmaps = mapEl.querySelector(".map-card").href;
+    const gmaps = mapEl.querySelector("[data-gmaps]").href;
     mapEl.innerHTML = "";
     mapEl.classList.add("live");
     const map = L.map(mapEl, { scrollWheelZoom: false, dragging: !L.Browser.mobile, tap: false }).setView([lat, lng], 17);
@@ -172,7 +185,15 @@ if (mapEl && window.L) {
       .bindPopup(`<b>Sport's Center 2</b><br>Via Cavour 3, Roveleto di Cadeo<br><a href="${gmaps}" target="_blank" rel="noopener">Apri in Google Maps</a>`);
     // se la mappa era nascosta quando è stata creata, la ridisegna quando torna visibile
     window.refreshMap = () => { map.invalidateSize(); map.setView([lat, lng], 17); };
-  } catch (e) { /* in caso di errore resta la cartolina */ }
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "Mappa non disponibile, riprova";
+  }
+}
+if (mapEl && mapEl.dataset.leafletJs) {
+  const btn = mapEl.querySelector("[data-map-load]");
+  btn.hidden = false;
+  mapEl.querySelector("[data-map-note]").hidden = false;
+  btn.addEventListener("click", showMap);
 }
 
 // Menu da telefono: si chiude con Esc

@@ -21,13 +21,17 @@
       <li><small>Email</small><a href="mailto:asd.sportcenter2@libero.it">asd.sportcenter2@libero.it</a></li>
       <li><small>Instagram</small><a href="https://www.instagram.com/asd.sportcenter2/" target="_blank" rel="noopener">@asd.sportcenter2</a></li>
     </ul>
-    <div class="map" id="map" data-lat="44.961502" data-lng="9.8564491">
-      <a class="map-card" href="https://www.google.com/maps/search/?api=1&amp;query=Sport+Center+Due+Cadeo&amp;query_place_id=ChIJxSSkzuPxgEcRZihV5Zrj_hQ" target="_blank" rel="noopener">
+    <div class="map" id="map" data-lat="44.961502" data-lng="9.8564491" data-leaflet-js="{{LEAFLET_JS}}" data-leaflet-css="{{LEAFLET_CSS}}">
+      <div class="map-card">
         <span class="map-pin"><img src="{{LOGO}}" alt="" width="64" height="64"></span>
         <b>Sport's Center 2</b>
         <span>Via Cavour 3 · Roveleto di Cadeo (PC)</span>
-        <span class="btn">Apri in Google Maps</span>
-      </a>
+        <div class="map-actions">
+          <button class="btn" type="button" data-map-load hidden>Mostra la mappa satellitare</button>
+          <a class="btn ghost" data-gmaps href="https://www.google.com/maps/search/?api=1&amp;query=Sport+Center+Due+Cadeo&amp;query_place_id=ChIJxSSkzuPxgEcRZihV5Zrj_hQ" target="_blank" rel="noopener">Apri in Google Maps</a>
+        </div>
+        <p class="map-note" data-map-note hidden>La mappa usa le immagini satellitari di Esri: mostrandola, il tuo browser si collega ai loro server. <a href="privacy.html#mappa">Più informazioni</a></p>
+      </div>
     </div>
   </div>
 </div>

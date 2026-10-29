@@ -20,6 +20,13 @@ FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n'
          '<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Chivo+Mono:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">')
 OUTDOOR_SRCSET = 'srcset="img/outdoor-720.webp 720w, img/outdoor-1179.webp 1179w"'
 
+# Font ospitati sul sito (src/fonts, ridotti ai caratteri latini e ai pesi usati): nessun collegamento a Google
+FONT_FACES = """@font-face{font-family:"Big Shoulders Display";src:url(fonts/big-shoulders-display.woff) format("woff");font-weight:700 900;font-display:swap}
+@font-face{font-family:"Manrope";src:url(fonts/manrope.woff) format("woff");font-weight:400 800;font-display:swap}
+@font-face{font-family:"Chivo Mono";src:url(fonts/chivo-mono.woff) format("woff");font-weight:500 700;font-display:swap}
+"""
+LEAFLET_VER = "1.9.4"
+
 def version(text):
     """Breve impronta del contenuto: cambia il nome richiesto quando il file cambia, così il browser non usa la copia vecchia."""
     return hashlib.sha1(text.encode()).hexdigest()[:8]
@@ -28,14 +35,20 @@ def version(text):
 INLINE = {
     "logo": LOGO, "outdoor": IMG_OUTDOOR, "outdoor_srcset": "",
     "icons": f'<link rel="icon" href="{LOGO}">',
-    "css": f"<style>\n{CSS}\n</style>", "js": f"<script>\n{JS}\n</script>", "preload": "",
+    "css": f"<style>\n{CSS}\n</style>", "js": f"<script>\n{JS}\n</script>", "preload": "", "fonts": FONTS,
+    "leaflet_js": f"https://cdnjs.cloudflare.com/ajax/libs/leaflet/{LEAFLET_VER}/leaflet.js",
+    "leaflet_css": f"https://cdnjs.cloudflare.com/ajax/libs/leaflet/{LEAFLET_VER}/leaflet.css",
 }
 FILES = {
     "logo": "img/logo-128.webp", "outdoor": "img/outdoor-1179.webp", "outdoor_srcset": OUTDOOR_SRCSET + ' sizes="100vw"',
     "icons": ('<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">\n'
               '<link rel="icon" href="img/favicon-192.png" sizes="192x192" type="image/png">\n'
               '<link rel="apple-touch-icon" href="img/apple-touch-icon.png">'),
-    "css": f'<link rel="stylesheet" href="assets/styles.css?v={version(CSS)}">',
+    "css": f'<link rel="stylesheet" href="assets/styles.css?v={version(FONT_FACES + CSS)}">',
+    "fonts": ('<link rel="preload" as="font" type="font/woff" href="assets/fonts/big-shoulders-display.woff" crossorigin>\n'
+              '<link rel="preload" as="font" type="font/woff" href="assets/fonts/manrope.woff" crossorigin>'),
+    "leaflet_js": f"assets/leaflet/leaflet.js?v={LEAFLET_VER}",
+    "leaflet_css": f"assets/leaflet/leaflet.css?v={LEAFLET_VER}",
     "js": f'<script src="assets/script.js?v={version(JS)}"></script>',
     "preload": ('<link rel="preload" as="image" href="img/outdoor-1179.webp" fetchpriority="high" '
                 'imagesrcset="img/outdoor-720.webp 720w, img/outdoor-1179.webp 1179w" imagesizes="100vw">'),
@@ -55,17 +68,17 @@ PAGES = [
      "Abbonamenti dal mensile all'annuale, ingresso giornaliero e tariffe ragazzi, per soci e non soci."),
     ("dove-trovarci.html", "Dove trovarci",  "var(--orange)", "Dove trovarci · Sport's Center 2",
      "Orari di apertura, indirizzo, telefono e mappa dello Sport's Center 2 a Roveleto di Cadeo."),
+    ("privacy.html",       "Privacy e cookie", "var(--chalk)", "Privacy e cookie · Sport's Center 2",
+     "Informativa sulla privacy e sui cookie del sito dello Sport's Center 2."),
 ]
-LEAFLET = ('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">\n'
-           '<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>\n')
-PREVIEW_MODE = False
+NOT_IN_MENU = {"index.html", "privacy.html"}  # la home si raggiunge dal logo, la privacy dal piè di pagina
 STRIPE = '<div class="stripe"><span></span><span></span><span></span><span></span><span></span></div>'
 
 def nav(current):
     items = []
     for f, label, color, *_ in PAGES:
-        if f == "index.html":
-            continue  # la home si raggiunge dal logo
+        if f in NOT_IN_MENU:
+            continue
         cls = ' active" aria-current="page' if f == current else ""
         items.append(f'<li><a class="nav-link{cls}" href="{f}" style="--c:{color}">{label}</a></li>')
     items.append('<li class="menu-extra"><a class="btn" data-tel href="#">Chiama lo 0523 500928</a>'
@@ -80,11 +93,12 @@ def band():
 
 def fill(text, a):
     return (text.replace("{{LOGO}}", a["logo"]).replace("{{IMG_OUTDOOR}}", a["outdoor"])
-                .replace("{{OUTDOOR_SRCSET}}", a["outdoor_srcset"]))
+                .replace("{{OUTDOOR_SRCSET}}", a["outdoor_srcset"])
+                .replace("{{LEAFLET_JS}}", a["leaflet_js"]).replace("{{LEAFLET_CSS}}", a["leaflet_css"]))
 
 def page(f, title, desc, a=INLINE):
     body = fill((SRC / "pages" / f).read_text(), a)
-    foot_links = " ".join(f'<a href="{p[0]}">{p[1]}</a>' for p in PAGES)
+    foot_links = " ".join(f'<a href="{p[0]}">{p[1]}</a>' for p in PAGES if p[0] != "privacy.html")
     return f"""<!doctype html>
 <html lang="it">
 <head>
@@ -96,7 +110,7 @@ def page(f, title, desc, a=INLINE):
 <meta name="description" content="{desc}">
 {a["icons"]}
 {a["preload"] if f == "index.html" else ""}
-{FONTS}
+{a["fonts"]}
 {a["css"]}
 </head>
 <body>
@@ -116,7 +130,7 @@ def page(f, title, desc, a=INLINE):
 </header>
 <main style="--sec:{dict((p[0],p[2]) for p in PAGES)[f]}">
 {body}
-{band() if f != "dove-trovarci.html" else ""}
+{band() if f not in ("dove-trovarci.html", "privacy.html") else ""}
 </main>
 <footer>
   <div class="wrap">
@@ -124,10 +138,10 @@ def page(f, title, desc, a=INLINE):
       <a class="brand" href="index.html"><img src="{a["logo"]}" alt="" width="42" height="42" loading="lazy"><div><b>Sport's Center 2</b><small>ASD · Roveleto di Cadeo (PC)</small></div></a>
       <nav aria-label="Menu secondario">{foot_links}</nav>
     </div>
-    <p class="legal">ASD Sport's Center Due Cadeo · C.F. 90010090331 · P.IVA 01650500331 · <a href="#"><span class="ph">Privacy &amp; cookie policy</span></a></p>
+    <p class="legal">ASD Sport's Center Due Cadeo · C.F. 90010090331 · P.IVA 01650500331 · <a href="privacy.html">Privacy e cookie</a></p>
   </div>
 </footer>
-{LEAFLET if f == "dove-trovarci.html" and not PREVIEW_MODE else ""}{a["js"]}
+{a["js"]}
 </body>
 </html>
 """
@@ -140,8 +154,13 @@ for old in DOCS.glob("*.html"):
     old.unlink()
 (DOCS / ".nojekyll").write_text("")
 (DOCS / "assets").mkdir(exist_ok=True)
-(DOCS / "assets" / "styles.css").write_text(CSS)
+(DOCS / "assets" / "styles.css").write_text(FONT_FACES + CSS)
 (DOCS / "assets" / "script.js").write_text(JS)
+import shutil
+for sub_dir in ("fonts", "leaflet"):
+    shutil.rmtree(DOCS / "assets" / sub_dir, ignore_errors=True)
+shutil.copytree(SRC / "fonts", DOCS / "assets" / "fonts")
+shutil.copytree(SRC / "vendor" / "leaflet", DOCS / "assets" / "leaflet")
 
 def build_images():
     """Logo, icone e foto ottimizzati per il sito online, ricavati dai file in src/img/."""
@@ -188,7 +207,7 @@ def preview():
     for f, label, ico, title, desc in PAGES:
         key = f[:-5]
         body = fill((SRC / "pages" / f).read_text(), INLINE)
-        extra = band() if f != "dove-trovarci.html" else ""
+        extra = band() if f not in ("dove-trovarci.html", "privacy.html") else ""
         sections.append(f'<div class="pv-page" data-page="{key}" data-title="{title}" style="--sec:{ico}" hidden>\n{body}\n{extra}\n</div>')
     full = page("index.html", PAGES[0][3], PAGES[0][4])
     main_open = full.index("<main")
@@ -228,7 +247,6 @@ window.addEventListener("hashchange", showPage);
 showPage();
 """
     full = full.replace("</script>\n</body>", router + "</script>\n</body>")
-    full = full.replace("<script>\n", LEAFLET + "<script>\n", 1)  # mappa vera quando si apre il file nel browser
     (ROOT / "anteprima-sito.html").write_text(full)
     print("ok anteprima-sito.html")
 
@@ -239,7 +257,8 @@ def artifact():
     style = re.search(r"<style>.*?</style>", full, re.S).group(0)
     fonts = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Chivo+Mono:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">'
     body = full[full.index("<body>") + 6 : full.index("</body>")]
-    body = body.replace(LEAFLET, "")  # nella pagina pubblicata la cartografia è bloccata: resta la cartolina
+    # nella pagina pubblicata su Claude la cartografia è bloccata: niente pulsante della mappa, resta la cartolina
+    body = re.sub(r'data-leaflet-js="[^"]*"', 'data-leaflet-js=""', body)
     out = "\n".join([title, '<meta name="claude:viewport-fit-sides" content="cover">', fonts, style, body])
     dest = pathlib.Path("/tmp/claude-0/-home-claude/09079919-c381-5bfc-ad5e-cabd613b0d76/scratchpad/sportcenter2-pubblicato.html")
     dest.write_text(out)

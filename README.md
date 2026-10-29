@@ -6,3 +6,7 @@ Sito della palestra ASD Sport's Center Due Cadeo (Roveleto di Cadeo, PC).
 - `src/img/` contiene le immagini originali (logo, foto). Per cambiarle basta sostituire il file e rilanciare la build.
 - `python3 build.py` genera il sito nella cartella `docs/`, che è quella pubblicata da GitHub Pages: pagine leggere, con stile, script e immagini ottimizzate (WebP) in file separati. Serve Pillow (`pip install pillow`).
 - Finché il sito è una bozza, `NOINDEX = True` in `build.py` chiede a Google di non indicizzarlo.
+
+## Privacy
+
+Il sito non usa cookie e non si collega a servizi esterni: font (`src/fonts`, licenza OFL) e libreria della mappa (`src/vendor/leaflet`, licenza BSD) sono ospitati qui. La mappa satellitare di Esri si carica solo quando il visitatore preme il pulsante. Se si aggiungono servizi esterni (statistiche, video, moduli) va aggiornata `src/pages/privacy.html` e, se usano cookie, serve un banner per il consenso.
