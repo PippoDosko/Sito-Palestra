@@ -128,7 +128,7 @@ document.querySelector(".menu-btn").addEventListener("click", () => {
 
 // Sezioni che compaiono scorrendo: solo ciò che all'apertura è fuori dallo schermo,
 // così la prima schermata è sempre completa anche senza scorrere.
-const REVEAL = ".space-row,.course,.price-group,.person,.wk-day,.outdoor,.band,.hours,.contacts,.req,.rules,#orari > div";
+const REVEAL = ".space-row,.course,.price-group,.person,.wk-day,.outdoor,.band,.hours,.contacts,.req,.rules,.shot,#orari > div";
 if ("IntersectionObserver" in window) {
   const io = new IntersectionObserver(entries => {
     let i = 0;
@@ -206,3 +206,35 @@ document.querySelectorAll("[data-today]").forEach(el => {
   const [, o, c] = HOURS[today];
   el.textContent = o ? fmt(o) + " – " + fmt(c) : "Chiuso oggi";
 });
+
+// Galleria: le foto si aprono ingrandite; frecce e tasti per scorrere, Esc o clic fuori per chiudere
+const gallery = document.querySelector("[data-gallery]");
+const lb = document.querySelector(".lightbox");
+if (gallery && lb && typeof lb.showModal === "function") {
+  const shots = [...gallery.querySelectorAll(".shot")];
+  const big = lb.querySelector("img");
+  let at = 0;
+  const show = i => {
+    at = (i + shots.length) % shots.length;
+    big.src = shots[at].href;
+    big.alt = shots[at].querySelector("img").alt;
+  };
+  shots.forEach((s, i) => s.addEventListener("click", e => { e.preventDefault(); show(i); lb.showModal(); }));
+  lb.querySelector(".lb-close").addEventListener("click", () => lb.close());
+  lb.querySelector(".lb-prev").addEventListener("click", () => show(at - 1));
+  lb.querySelector(".lb-next").addEventListener("click", () => show(at + 1));
+  lb.addEventListener("click", e => { if (e.target === lb) lb.close(); });
+  lb.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") show(at - 1);
+    if (e.key === "ArrowRight") show(at + 1);
+  });
+  // su telefono: scorri con il dito
+  let x0 = null;
+  lb.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
+  lb.addEventListener("touchend", e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 40) show(at + (dx < 0 ? 1 : -1));
+    x0 = null;
+  });
+}

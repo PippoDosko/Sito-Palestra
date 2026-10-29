@@ -3,7 +3,7 @@
   per stile, script e immagini, scaricati una volta sola e tenuti in memoria dal browser.
 - dist/ e anteprima-sito.html: versioni autosufficienti (tutto incorporato) per le anteprime.
 Uso: python3 build.py   (richiede Pillow per le immagini)"""
-import base64, hashlib, pathlib
+import base64, hashlib, pathlib, re
 
 ROOT = pathlib.Path(__file__).parent
 SRC, DIST = ROOT / "src", ROOT / "dist"
@@ -13,12 +13,66 @@ for old in DIST.glob("*.html"):
 
 LOGO = "data:image/png;base64," + base64.b64encode((SRC / "img" / "logo.png").read_bytes()).decode()
 CSS = (SRC / "styles.css").read_text()
-IMG_OUTDOOR = "data:image/jpeg;base64," + base64.b64encode((SRC / "img" / "outdoor.jpg").read_bytes()).decode()
 JS = (SRC / "script.js").read_text()
 FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n'
          '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
          '<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Chivo+Mono:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">')
-OUTDOOR_SRCSET = 'srcset="img/outdoor-720.webp 720w, img/outdoor-1179.webp 1179w"'
+# Foto del sito: originali in src/img/photos/<nome>.jpg
+# nome: (ritaglio x, y, larghezza, altezza oppure None, larghezze generate, attributo sizes)
+ROW = "(max-width: 860px) 100vw, 640px"
+GAL = "(max-width: 600px) 50vw, (max-width: 1040px) 33vw, 300px"
+PHOTOS = {
+    "hero":       (None,                 (800, 1600), "100vw"),
+    "pesi":       (None,                 (640, 1200), ROW),
+    "cardio":     ((0, 330, 1200, 800),  (640, 1200), ROW),
+    "corsi":      (None,                 (640, 1200), ROW),
+    "outdoor":    (None,                 (640, 1200), ROW),
+    "spogliatoi": ((0, 380, 1200, 900),  (640, 1200), ROW),
+    "ingresso":   ((0, 250, 1170, 780),  (640, 1170), "(max-width: 860px) 100vw, 480px"),
+    **{g: (None, (480, 960), GAL) for g in ("g-macchine", "g-manubri", "g-rack", "g-funzionale", "g-dischi", "g-reception", "g-triform")},
+}
+SITE_URL = "https://pippodosko.github.io/Sito-Palestra/"  # da aggiornare con il dominio definitivo
+
+from PIL import Image
+import io
+
+def open_photo(name):
+    im = Image.open(SRC / "img" / "photos" / f"{name}.jpg").convert("RGB")
+    crop = PHOTOS[name][0]
+    if crop:
+        x, y, w, h = crop
+        im = im.crop((x, y, x + w, y + h))
+    return im
+
+def scaled(im, w):
+    return im if im.width <= w else im.resize((w, round(w * im.height / im.width)), Image.LANCZOS)
+
+_inline_cache = {}
+def inline_photo(name):
+    """Versione incorporata (anteprime): JPEG leggero in base64."""
+    if name not in _inline_cache:
+        buf = io.BytesIO(); scaled(open_photo(name), 900).save(buf, "JPEG", quality=68, optimize=True)
+        _inline_cache[name] = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+    return _inline_cache[name]
+
+def photo_tag(name, alt, cls, eager, a):
+    im = open_photo(name)
+    widths = [w for w in PHOTOS[name][1] if w <= im.width] or [im.width]
+    h = round(widths[-1] * im.height / im.width)
+    attrs = f' class="{cls}"' if cls else ""
+    if a is INLINE:
+        src, srcset = inline_photo(name), ""
+    else:
+        src = f"img/{name}-{widths[-1]}.webp"
+        srcset = ' srcset="' + ", ".join(f"img/{name}-{w}.webp {w}w" for w in widths) + f'" sizes="{PHOTOS[name][2]}"'
+    load = ' fetchpriority="high"' if eager else ' loading="lazy" decoding="async"'
+    return f'<img src="{src}"{srcset} width="{widths[-1]}" height="{h}" alt="{alt}"{attrs}{load}>'
+
+def photo_url(name, a):
+    if a is INLINE:
+        return inline_photo(name)
+    im = open_photo(name)
+    return f"img/{name}-{max(w for w in PHOTOS[name][1] if w <= im.width)}.webp"
 
 # Font ospitati sul sito (src/fonts, ridotti ai caratteri latini e ai pesi usati): nessun collegamento a Google
 FONT_FACES = """@font-face{font-family:"Big Shoulders Display";src:url(fonts/big-shoulders-display.woff) format("woff");font-weight:700 900;font-display:swap}
@@ -33,14 +87,18 @@ def version(text):
 
 # Risorse per le due modalità: incorporate (anteprime) oppure file separati (sito online)
 INLINE = {
-    "logo": LOGO, "outdoor": IMG_OUTDOOR, "outdoor_srcset": "",
+    "logo": LOGO, "og": "",
     "icons": f'<link rel="icon" href="{LOGO}">',
     "css": f"<style>\n{CSS}\n</style>", "js": f"<script>\n{JS}\n</script>", "preload": "", "fonts": FONTS,
     "leaflet_js": f"https://cdnjs.cloudflare.com/ajax/libs/leaflet/{LEAFLET_VER}/leaflet.js",
     "leaflet_css": f"https://cdnjs.cloudflare.com/ajax/libs/leaflet/{LEAFLET_VER}/leaflet.css",
 }
 FILES = {
-    "logo": "img/logo-128.webp", "outdoor": "img/outdoor-1179.webp", "outdoor_srcset": OUTDOOR_SRCSET + ' sizes="100vw"',
+    "logo": "img/logo-128.webp",
+    "og": (f'<meta property="og:type" content="website">\n<meta property="og:locale" content="it_IT">\n'
+           f'<meta property="og:site_name" content="Sport\'s Center 2">\n'
+           f'<meta property="og:image" content="{SITE_URL}img/og.jpg">\n<meta property="og:image:width" content="1200">\n'
+           f'<meta property="og:image:height" content="630">\n<meta name="twitter:card" content="summary_large_image">'),
     "icons": ('<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">\n'
               '<link rel="icon" href="img/favicon-192.png" sizes="192x192" type="image/png">\n'
               '<link rel="apple-touch-icon" href="img/apple-touch-icon.png">'),
@@ -50,8 +108,8 @@ FILES = {
     "leaflet_js": f"assets/leaflet/leaflet.js?v={LEAFLET_VER}",
     "leaflet_css": f"assets/leaflet/leaflet.css?v={LEAFLET_VER}",
     "js": f'<script src="assets/script.js?v={version(JS)}"></script>',
-    "preload": ('<link rel="preload" as="image" href="img/outdoor-1179.webp" fetchpriority="high" '
-                'imagesrcset="img/outdoor-720.webp 720w, img/outdoor-1179.webp 1179w" imagesizes="100vw">'),
+    "preload": ('<link rel="preload" as="image" href="img/hero-1600.webp" fetchpriority="high" '
+                'imagesrcset="img/hero-800.webp 800w, img/hero-1600.webp 1600w" imagesizes="100vw">'),
 }
 
 # file, voce di menu, icona, titolo della scheda, descrizione per Google
@@ -92,8 +150,10 @@ def band():
     {STRIPE}</div></div>"""
 
 def fill(text, a):
-    return (text.replace("{{LOGO}}", a["logo"]).replace("{{IMG_OUTDOOR}}", a["outdoor"])
-                .replace("{{OUTDOOR_SRCSET}}", a["outdoor_srcset"])
+    text = re.sub(r"\{\{PHOTO(_EAGER)?:([\w-]+)\|([^|}]*)(?:\|([^}]*))?\}\}",
+                  lambda m: photo_tag(m.group(2), m.group(3), m.group(4), bool(m.group(1)), a), text)
+    text = re.sub(r"\{\{PHOTO_URL:([\w-]+)\}\}", lambda m: photo_url(m.group(1), a), text)
+    return (text.replace("{{LOGO}}", a["logo"])
                 .replace("{{LEAFLET_JS}}", a["leaflet_js"]).replace("{{LEAFLET_CSS}}", a["leaflet_css"]))
 
 def page(f, title, desc, a=INLINE):
@@ -108,6 +168,7 @@ def page(f, title, desc, a=INLINE):
 <meta name="color-scheme" content="dark">
 <title>{title}</title>
 <meta name="description" content="{desc}">
+{a["og"].replace('<meta property="og:type"', f'<meta property="og:title" content="{title}">\n<meta property="og:description" content="{desc}">\n<meta property="og:url" content="{SITE_URL}{"" if f == "index.html" else f}">\n<meta property="og:type"') if a["og"] else ""}
 {a["icons"]}
 {a["preload"] if f == "index.html" else ""}
 {a["fonts"]}
@@ -166,7 +227,8 @@ def build_images():
     """Logo, icone e foto ottimizzati per il sito online, ricavati dai file in src/img/."""
     from PIL import Image
     out = DOCS / "img"
-    out.mkdir(exist_ok=True)
+    shutil.rmtree(out, ignore_errors=True)
+    out.mkdir()
     logo = Image.open(SRC / "img" / "logo.png").convert("RGBA")
     small = lambda im: im.quantize(colors=128, method=Image.FASTOCTREE, dither=Image.FLOYDSTEINBERG)
     logo.resize((128, 128), Image.LANCZOS).save(out / "logo-128.webp", quality=88, method=6)
@@ -175,9 +237,16 @@ def build_images():
     tile = Image.new("RGBA", (180, 180), (15, 15, 14, 255))  # icona per la schermata Home dell'iPhone
     tile.alpha_composite(logo.resize((156, 156), Image.LANCZOS), (12, 12))
     small(tile).save(out / "apple-touch-icon.png", optimize=True)
-    photo = Image.open(SRC / "img" / "outdoor.jpg").convert("RGB")
-    photo.save(out / "outdoor-1179.webp", quality=72, method=6)
-    photo.resize((720, round(720 * photo.height / photo.width)), Image.LANCZOS).save(out / "outdoor-720.webp", quality=72, method=6)
+    for name, (_, widths, _) in PHOTOS.items():
+        im = open_photo(name)
+        for w in widths:
+            if w <= im.width:
+                scaled(im, w).save(out / f"{name}-{w}.webp", quality=74, method=6)
+    # immagine per l'anteprima dei link condivisi (WhatsApp, Facebook...): 1200x630
+    hero = open_photo("hero")
+    hh = round(1200 * hero.height / hero.width)
+    og = hero.resize((1200, hh), Image.LANCZOS).crop((0, (hh - 630) // 2, 1200, (hh - 630) // 2 + 630))
+    og.save(out / "og.jpg", quality=82, optimize=True)
 
 build_images()
 
