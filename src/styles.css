@@ -117,14 +117,14 @@ header.open .menu-btn span:nth-child(3){transform:translateY(-8px) rotate(-45deg
 
 /* Riquadri verso le sezioni */
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding-bottom:96px}
-.tile{position:relative;display:flex;flex-direction:column;gap:10px;min-height:230px;text-decoration:none;background:var(--bg-2);border:1px solid var(--line);
+.tile{position:relative;display:flex;flex-direction:column;gap:10px;min-height:176px;text-decoration:none;background:var(--bg-2);border:1px solid var(--line);
   border-radius:var(--r-lg);padding:26px 24px 22px;overflow:hidden;transition:transform 220ms var(--ease-out),background 200ms ease,border-color 200ms ease}
 .tile:active{transform:scale(0.98)}
 .tile::before{content:"";width:28px;height:4px;border-radius:2px;background:var(--c)}
-.tile h2{font-family:var(--f-display);font-weight:800;text-transform:uppercase;font-size:2.3rem;line-height:.92;margin-top:8px}
-.tile p{color:var(--chalk-2);font-size:.95rem;flex:1}
+.tile h2{font-family:var(--f-display);font-weight:800;text-transform:uppercase;font-size:2.6rem;line-height:.92;margin-top:8px;margin-bottom:auto}
 .tile .go{display:flex;align-items:center;justify-content:space-between;font:600 .74rem/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
   padding-top:16px;border-top:1px solid var(--line);transition:color 150ms ease}
+.tile .go{margin-top:14px}
 .tile .go i{font-style:normal;color:var(--c);transition:transform 220ms var(--ease-out)}
 
 /* =========================================================
