@@ -287,9 +287,11 @@ def preview():
     full = full.replace(' active" aria-current="page', "")
     full = to_hash(full)
     router = """
-// Navigazione dell'anteprima unica
-function showPage(){
-  const [key, anchor] = (location.hash.slice(1) || "index").split(".");
+// Navigazione dell'anteprima unica.
+// Cambia pagina direttamente al tocco: funziona anche nei visualizzatori che bloccano il cambio d'indirizzo.
+function showPage(hash){
+  if (typeof hash !== "string") hash = location.hash;
+  const [key, anchor] = (hash.slice(1) || "index").split(".");
   let found = false;
   document.querySelectorAll(".pv-page").forEach(p => {
     const on = p.dataset.page === key; p.hidden = !on;
@@ -300,7 +302,7 @@ function showPage(){
                   { duration: 260, easing: "cubic-bezier(0.23, 1, 0.32, 1)" });
     }
   });
-  if (!found) { location.hash = "#index"; return; }
+  if (!found) { showPage("#index"); return; }
   document.querySelectorAll(".nav-link").forEach(a => {
     const on = a.getAttribute("href") === "#" + key;
     a.classList.toggle("active", on);
@@ -312,7 +314,18 @@ function showPage(){
   const target = anchor && document.querySelector(`.pv-page[data-page="${key}"] #${anchor}`);
   if (target) target.scrollIntoView(); else window.scrollTo(0, 0);
 }
-window.addEventListener("hashchange", showPage);
+document.addEventListener("click", e => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a || a.getAttribute("href").length < 2) return;
+  const hash = a.getAttribute("href");
+  const key = hash.slice(1).split(".")[0];
+  if (!document.querySelector(`.pv-page[data-page="${key}"]`)) return;
+  e.preventDefault();
+  showPage(hash);
+  try { history.pushState(null, "", hash); } catch (err) { /* visualizzatore protetto: va bene lo stesso */ }
+});
+window.addEventListener("popstate", () => showPage());
+window.addEventListener("hashchange", () => showPage());
 showPage();
 """
     full = full.replace("</script>\n</body>", router + "</script>\n</body>")
